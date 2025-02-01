@@ -7,8 +7,6 @@ import hashlib
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
-from dotenv import load_dotenv
-import os
 
 app = Flask(__name__)
 CORS(app)
@@ -23,13 +21,10 @@ except errors.ServerSelectionTimeoutError:
     client = None
 
 # Load private key into memory
-load_dotenv()
-private_key_b64 = os.getenv("PRIVATE_KEY")
-if not private_key_b64:
-    raise ValueError("PRIVATE_KEY is missing in .env")
-
-private_key_bytes = base64.b64decode(private_key_b64)
+with open("server_private.pem", "rb") as key_file:
+    private_key_bytes = key_file.read()
 server_private_key = RSA.import_key(private_key_bytes)
+
 
 
 
@@ -107,9 +102,9 @@ def get_public_key(identifier):
         return jsonify({"error": "Database connection failed"}), 503
     
     if is_valid_uuid(identifier):
-        user = users_collection.find_one({"_id": identifier}, {"_id": 0, "publicKey": 1})
+        user = userstorage.find_one({"_id": identifier}, {"_id": 0, "publicKey": 1})
     else:
-        user = users_collection.find_one({"username": identifier}, {"_id": 0, "publicKey": 1})
+        user = userstorage.find_one({"username": identifier}, {"_id": 0, "publicKey": 1})
     
     if user:
         return jsonify({"publicKey": user["publicKey"]})
@@ -121,13 +116,12 @@ def get_auth_key():
     if client is None:
         return jsonify({"error": "Database connection failed"}), 503
     
-    root_key = keys_collection.find_one({"_id": "root", "keyOwner": "root"}, {"_id": 0, "keyValue": 1})
+    root_key = keystorage.find_one({"_id": "root", "keyOwner": "root"}, {"_id": 0, "keyValue": 1})
     
     if root_key:
         return jsonify({"status": 100, "serverPublicKey": root_key["keyValue"]})
     
     return jsonify({"error": "Root key not found"}), 404
-
 
 
 if __name__ == "__main__":
